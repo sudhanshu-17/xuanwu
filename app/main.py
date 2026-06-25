@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v2.router import api_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     )
 
     register_exception_handlers(app)
+    app.include_router(api_router)
 
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, str]:
