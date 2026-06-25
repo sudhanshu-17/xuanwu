@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     totp_issuer: str = "Xuanwu"
     api_key_nonce_window_ms: int = 5000
 
+    # --- Authorization (RBAC) ---
+    authz_rules_path: str = "config/authz_rules.yml"
+    permission_cache_ttl: int = 300  # 5 minutes
+
     # --- Email ---
     email_provider: str = "smtp"
     smtp_host: str = "mailhog"
