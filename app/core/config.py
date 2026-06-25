@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     app_name: str = "xuanwu"
     log_level: str = "info"
     cors_origins: str = "http://localhost:3000"  # comma-separated
+    first_user_superadmin: bool = True  # the very first registered user becomes superadmin
 
     # --- Database (MySQL 8) ---
     database_url: str

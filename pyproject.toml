@@ -85,9 +85,23 @@ select = [
 ]
 ignore = []
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI uses these as call expressions in argument defaults by design.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.Cookie",
+    "fastapi.Form",
+    "fastapi.File",
+]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106"]       # asserts and dummy secrets are expected in tests
 "app/core/config.py" = ["S105", "S106"]     # default values for settings fields, not real secrets
+"app/services/auth_service.py" = ["S105"]   # token-type/title constants, not secrets
 
 [tool.mypy]
 python_version = "3.12"
