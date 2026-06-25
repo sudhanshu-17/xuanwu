@@ -4,9 +4,10 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.encryption import EncryptedString
 from app.db.base import GUID, Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -21,7 +22,7 @@ class Phone(Base, TimestampMixin):
         GUID(), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     country: Mapped[str | None] = mapped_column(String(2), default=None)
-    number: Mapped[str] = mapped_column(Text)  # encrypted at rest (Phase 3)
+    number: Mapped[str] = mapped_column(EncryptedString())  # encrypted at rest
     number_index: Mapped[str] = mapped_column(String(64))  # blind index (HMAC-SHA256)
     code: Mapped[str | None] = mapped_column(String(10), default=None)  # verification code
     validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)

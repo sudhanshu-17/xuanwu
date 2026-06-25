@@ -2,9 +2,10 @@
 
 import uuid
 
-from sqlalchemy import JSON, Index, String, Text
+from sqlalchemy import JSON, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.encryption import EncryptedString
 from app.db.base import GUID, Base, TimestampMixin
 from app.models.enums import DEFAULT_API_KEY_ALGORITHM, APIKeyState
 
@@ -16,7 +17,7 @@ class APIKey(Base, TimestampMixin):
     kid: Mapped[str] = mapped_column(String(64), unique=True)
     algorithm: Mapped[str] = mapped_column(String(10), default=DEFAULT_API_KEY_ALGORITHM)
     scope: Mapped[list[str] | None] = mapped_column(JSON, default=None)
-    secret: Mapped[str] = mapped_column(Text)  # encrypted at rest (Phase 3)
+    secret: Mapped[str] = mapped_column(EncryptedString())  # encrypted at rest
     state: Mapped[str] = mapped_column(String(20), default=APIKeyState.active.value)
 
     # Polymorphic owner (User or ServiceAccount); no FK because it spans tables.

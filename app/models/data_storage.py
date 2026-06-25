@@ -3,9 +3,10 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.encryption import EncryptedString
 from app.db.base import GUID, Base, TimestampMixin
 
 if TYPE_CHECKING:
@@ -20,7 +21,7 @@ class DataStorage(Base, TimestampMixin):
         GUID(), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(255))
-    data: Mapped[str] = mapped_column(Text)  # encrypted at rest (Phase 3)
+    data: Mapped[str] = mapped_column(EncryptedString())  # encrypted at rest
 
     user: Mapped["User"] = relationship(back_populates="data_storages")
 
