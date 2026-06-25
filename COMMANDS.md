@@ -14,6 +14,7 @@ the `xuanwu/` directory.
 ```bash
 cp .env.example .env                       # create local env (once)
 docker compose run --rm api alembic upgrade head   # build the schema
+docker compose run --rm api python -m app.db.seeds # seed RBAC permissions + levels (idempotent)
 ```
 
 ## Run the app
