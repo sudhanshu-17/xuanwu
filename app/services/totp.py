@@ -20,6 +20,11 @@ def generate_secret() -> str:
     return pyotp.random_base32()
 
 
+def verify_totp(secret: str, code: str) -> bool:
+    """Verify a code without the replay guard (for already-authenticated mutations)."""
+    return bool(pyotp.TOTP(secret).verify(code, valid_window=1))
+
+
 def provisioning_uri(secret: str, account_name: str) -> str:
     return pyotp.TOTP(secret).provisioning_uri(name=account_name, issuer_name=settings.totp_issuer)
 
