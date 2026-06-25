@@ -29,6 +29,8 @@ def test_refresh_token_type_is_enforced() -> None:
 
 def test_tampered_token_is_rejected() -> None:
     token, _ = security.create_access_token("user-1", "member")
-    tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+    header, payload, signature = token.split(".")
+    flipped = "B" if payload[0] != "B" else "C"
+    tampered = f"{header}.{flipped}{payload[1:]}.{signature}"
     with pytest.raises(jwt.InvalidTokenError):
         security.decode_token(tampered)
