@@ -38,14 +38,14 @@ async def _login_as(client: AsyncClient, db: AsyncSession, role: str, state: str
 
 
 async def test_protected_route_requires_authentication(client: AsyncClient) -> None:
-    resp = await client.get(f"{RESOURCE}/me")
+    resp = await client.get(f"{RESOURCE}/users/me")
     assert resp.status_code == 401
     assert "authz.unauthorized" in resp.json()["errors"]
 
 
 async def test_member_can_access_own_resource(client: AsyncClient, db: AsyncSession) -> None:
     await _login_as(client, db, role="member")
-    resp = await client.get(f"{RESOURCE}/me")
+    resp = await client.get(f"{RESOURCE}/users/me")
     assert resp.status_code == 200
     assert resp.json()["data"]["role"] == "member"
 
@@ -89,7 +89,7 @@ async def test_banned_user_is_rejected(client: AsyncClient, db: AsyncSession) ->
     assert user is not None
     user.state = "banned"
     await db.commit()
-    resp = await client.get(f"{RESOURCE}/me")
+    resp = await client.get(f"{RESOURCE}/users/me")
     assert resp.status_code == 401
 
 
@@ -114,7 +114,7 @@ async def test_api_key_authorizes_via_hmac(client: AsyncClient, db: AsyncSession
     nonce = str(int(time.time() * 1000))
     signature = expected_signature(secret, nonce, kid)
     resp = await client.get(
-        f"{RESOURCE}/me",
+        f"{RESOURCE}/users/me",
         headers={"X-Auth-Apikey": kid, "X-Auth-Nonce": nonce, "X-Auth-Signature": signature},
     )
     assert resp.status_code == 200
@@ -140,7 +140,7 @@ async def test_api_key_bad_signature_rejected(client: AsyncClient, db: AsyncSess
 
     nonce = str(int(time.time() * 1000))
     resp = await client.get(
-        f"{RESOURCE}/me",
+        f"{RESOURCE}/users/me",
         headers={"X-Auth-Apikey": kid, "X-Auth-Nonce": nonce, "X-Auth-Signature": "deadbeef"},
     )
     assert resp.status_code == 401
