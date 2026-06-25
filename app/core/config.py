@@ -6,6 +6,7 @@ local ``.env`` file in development). Import ``settings`` everywhere; never read
 """
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -39,15 +40,32 @@ class Settings(BaseSettings):
     jwt_private_key_path: str = "config/keys/jwt_private.pem"
     jwt_public_key_path: str = "config/keys/jwt_public.pem"
 
+    # --- JWT ---
+    jwt_issuer: str = "xuanwu"
+    jwt_audience: str = "xuanwu"
+
     # --- Token / session policy ---
     access_token_ttl: int = 900  # 15 minutes
     refresh_token_ttl: int = 604800  # 7 days
     login_max_attempts: int = 5
     login_lockout_ttl: int = 900  # 15 minutes
 
+    # --- Auth cookies ---
+    access_cookie_name: str = "access_token"
+    refresh_cookie_name: str = "refresh_token"
+    csrf_cookie_name: str = "csrf_token"
+    cookie_secure: bool = False  # True in production (HTTPS)
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    cookie_domain: str | None = None
+
     # --- Password policy ---
     password_min_length: int = 8
     password_max_length: int = 80
+    password_min_score: int = 2  # zxcvbn 0..4
+
+    # --- TOTP / API keys ---
+    totp_issuer: str = "Xuanwu"
+    api_key_nonce_window_ms: int = 5000
 
     # --- Email ---
     email_provider: str = "smtp"

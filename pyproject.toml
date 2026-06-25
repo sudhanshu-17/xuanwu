@@ -55,6 +55,7 @@ dev = [
     "pytest>=9.1,<10",
     "pytest-asyncio>=1.4,<2",
     "factory-boy>=3.3",
+    "fakeredis>=2.26,<3",
     "types-pyyaml>=6.0",
     "types-passlib>=1.7",
 ]
@@ -96,10 +97,18 @@ plugins = ["pydantic.mypy"]
 warn_unused_configs = true
 warn_unreachable = true
 
+[[tool.mypy.overrides]]
+module = ["zxcvbn", "qrcode", "pyotp", "fakeredis"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-ra"
+filterwarnings = [
+    # passlib imports the stdlib `crypt` module, deprecated upstream; not our code.
+    "ignore:'crypt' is deprecated:DeprecationWarning",
+]
 
 [tool.bandit]
 exclude_dirs = ["tests", "alembic"]

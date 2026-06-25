@@ -90,6 +90,8 @@ factory-boy==3.3.3
     # via xuanwu (pyproject.toml)
 faker==40.23.0
     # via factory-boy
+fakeredis==2.36.2
+    # via xuanwu (pyproject.toml)
 fastapi==0.138.0
     # via xuanwu (pyproject.toml)
 filelock==3.29.4
@@ -243,6 +245,7 @@ qrcode==8.2
 redis==5.3.1
     # via
     #   xuanwu (pyproject.toml)
+    #   fakeredis
     #   kombu
 requests==2.34.2
     # via
@@ -264,7 +267,9 @@ six==1.17.0
 slowapi==0.1.10
     # via xuanwu (pyproject.toml)
 sortedcontainers==2.4.0
-    # via cyclonedx-python-lib
+    # via
+    #   cyclonedx-python-lib
+    #   fakeredis
 sqlalchemy==2.0.51
     # via
     #   xuanwu (pyproject.toml)

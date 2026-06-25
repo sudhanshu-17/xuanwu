@@ -1,5 +1,11 @@
-"""Shared pytest fixtures.
+"""Shared pytest fixtures."""
 
-Phase 0: intentionally minimal. The transactional DB fixture, ``auth_client``
-and Redis test instance are added in Phase 15 (Testing).
-"""
+import pytest
+import redis.asyncio as redis
+from fakeredis import FakeAsyncRedis
+
+
+@pytest.fixture
+def fake_redis() -> redis.Redis:
+    """An in-memory async Redis, so Redis-backed logic is unit-testable offline."""
+    return FakeAsyncRedis(decode_responses=True)
