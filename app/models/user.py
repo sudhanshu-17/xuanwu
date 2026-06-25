@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.encryption import EncryptedString
 from app.db.base import GUID, Base, TimestampMixin
 from app.models.enums import DEFAULT_ROLE, UserState
 from app.utils.uid import generate_uid
@@ -34,6 +35,7 @@ class User(Base, TimestampMixin):
     data: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     level: Mapped[int] = mapped_column(Integer, default=0)
     otp: Mapped[bool] = mapped_column(Boolean, default=False)
+    otp_secret: Mapped[str | None] = mapped_column(EncryptedString(), default=None)  # 2FA seed
     state: Mapped[str] = mapped_column(String(50), default=UserState.pending.value, index=True)
     referral_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), default=None

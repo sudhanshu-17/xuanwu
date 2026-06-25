@@ -17,7 +17,6 @@ from app.core import security
 from app.core.config import settings
 from app.core.errors import APIError
 from app.core.tokens import TokenPair, TokenService
-from app.models.data_storage import DataStorage
 from app.models.enums import UserState
 from app.models.label import Label
 from app.models.user import User
@@ -28,23 +27,11 @@ EMAIL_CONFIRM_TYPE = "email_confirm"
 PASSWORD_RESET_TYPE = "password_reset"  # token type, not a secret  # nosec B105
 _EMAIL_TOKEN_TTL = 3600  # 1 hour
 _PASSWORD_TOKEN_TTL = 1800  # 30 minutes
-_OTP_SECRET_TITLE = "otp_secret"  # 2FA DataStorage title (Phase 6)  # nosec B105
 
 
 # --- lookups -----------------------------------------------------------------
 async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
     return cast("User | None", await db.scalar(select(User).where(User.email == email)))
-
-
-async def _otp_secret(db: AsyncSession, user_id: uuid.UUID) -> str | None:
-    row = await db.scalar(
-        select(DataStorage).where(
-            DataStorage.user_id == user_id, DataStorage.title == _OTP_SECRET_TITLE
-        )
-    )
-    if row is None:
-        return None
-    return row.data
 
 
 # --- registration ------------------------------------------------------------
@@ -119,7 +106,7 @@ async def login(
         raise APIError(["identity.session.invalid_credentials"], 401)
 
     if user.otp:
-        secret = await _otp_secret(db, user.id)
+        secret = user.otp_secret
         if not otp_code:
             raise APIError(["identity.session.missing_otp"], 401)
         if secret is None or not await TOTPService(redis_client).verify(

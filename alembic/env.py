@@ -10,6 +10,7 @@ from logging.config import fileConfig
 import app.models  # noqa: F401  (registers every model on Base.metadata)
 from alembic import context
 from app.core.config import settings
+from app.core.encryption import EncryptedString
 from app.db.base import GUID, Base
 from sqlalchemy import engine_from_config, pool
 
@@ -23,9 +24,11 @@ target_metadata = Base.metadata
 
 
 def render_item(type_, obj, autogen_context):
-    """Render the custom UUID type as plain CHAR(36) so migrations need no app imports."""
+    """Render custom column types with plain SQLAlchemy types so migrations need no app imports."""
     if type_ == "type" and isinstance(obj, GUID):
         return "sa.CHAR(36)"
+    if type_ == "type" and isinstance(obj, EncryptedString):
+        return "sa.Text()"
     return False
 
 
