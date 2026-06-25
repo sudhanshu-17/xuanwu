@@ -7,13 +7,11 @@ there is a single source of truth.
 
 from logging.config import fileConfig
 
+import app.models  # noqa: F401  (registers every model on Base.metadata)
 from alembic import context
 from app.core.config import settings
-from app.db.base import Base
+from app.db.base import GUID, Base
 from sqlalchemy import engine_from_config, pool
-
-# Import models here as they are added so autogenerate sees their metadata.
-# (none yet — added in Phase 2)
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url_sync)
@@ -24,6 +22,13 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def render_item(type_, obj, autogen_context):
+    """Render the custom UUID type as plain CHAR(36) so migrations need no app imports."""
+    if type_ == "type" and isinstance(obj, GUID):
+        return "sa.CHAR(36)"
+    return False
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=settings.database_url_sync,
@@ -31,6 +36,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        render_item=render_item,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -47,6 +53,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
+            render_item=render_item,
         )
         with context.begin_transaction():
             context.run_migrations()
