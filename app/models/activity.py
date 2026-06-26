@@ -4,8 +4,8 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, event, func
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from app.db.base import GUID, Base
 
@@ -36,3 +36,24 @@ class Activity(Base):
     user: Mapped["User | None"] = relationship(back_populates="activities")
 
     __table_args__ = (Index("ix_activities_created_at", "created_at"),)
+
+
+class ActivityImmutableError(RuntimeError):
+    """Raised on any attempt to update or delete an audit record."""
+
+
+@event.listens_for(Session, "before_flush")
+def _enforce_activity_immutability(
+    session: Session, flush_context: object, instances: object
+) -> None:
+    """Reject updates/deletes to ``Activity`` before the flush emits any SQL.
+
+    Inserting new records is always allowed (they live in ``session.new``);
+    only modifications (``session.dirty``) and deletions are blocked. Raising at
+    ``before_flush`` keeps the connection clean — raising later, mid-flush, can
+    trip async IO during error unwinding.
+    """
+    if any(isinstance(obj, Activity) for obj in session.deleted):
+        raise ActivityImmutableError("activities are append-only and cannot be deleted")
+    if any(isinstance(obj, Activity) and session.is_modified(obj) for obj in session.dirty):
+        raise ActivityImmutableError("activities are append-only and cannot be modified")

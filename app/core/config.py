@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     celery_broker_url: str = "redis://redis:6379/1"
     celery_result_backend: str = "redis://redis:6379/2"
+    celery_task_always_eager: bool = False  # run tasks inline (tests/dev without a worker)
+
+    # --- GeoIP (audit trail country resolution) ---
+    geoip_provider: str = "none"  # none | maxmind
+    geoip_db_path: str = "config/geoip/GeoLite2-Country.mmdb"
 
     # --- Crypto / secrets ---
     secret_key: str

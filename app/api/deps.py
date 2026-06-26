@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
+from app.core.activity import log_activity, request_meta
 from app.core.authorize import authorize
 from app.core.config import settings
 from app.core.csrf import CSRF_HEADER, tokens_match
@@ -92,7 +93,22 @@ async def authorized_user(
             request.cookies.get(settings.csrf_cookie_name), request.headers.get(CSRF_HEADER)
         ):
             raise APIError(["identity.csrf.invalid"], 403)
-    await authorize(db, redis_client, role=user.role, method=request.method, path=request.url.path)
+    topics = await authorize(
+        db, redis_client, role=user.role, method=request.method, path=request.url.path
+    )
+    if topics:
+        ip, user_agent = request_meta(request)
+        for topic in topics:
+            log_activity(
+                topic=topic,
+                action=request.method,
+                result="succeed",
+                category="audit",
+                user_id=user.id,
+                ip=ip,
+                user_agent=user_agent,
+                data={"path": request.url.path},
+            )
     return user
 
 

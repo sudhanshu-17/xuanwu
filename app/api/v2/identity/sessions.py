@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import client_ip, get_redis
 from app.core import security
 from app.core import tokens as token_cookies
+from app.core.activity import log_activity, request_meta
 from app.core.config import settings
 from app.core.errors import APIError
 from app.core.tokens import TokenService
@@ -34,6 +35,7 @@ async def create_session(
         password=payload.password,
         otp_code=payload.otp_code,
         ip=client_ip(request),
+        user_agent=request.headers.get("user-agent"),
     )
     token_cookies.set_auth_cookies(response, pair)
     return Envelope[SessionOut](
@@ -66,6 +68,16 @@ async def delete_session(
         try:
             payload = security.decode_token(refresh_token, expected_type=security.REFRESH_TYPE)
             await TokenService(redis_client).revoke(payload["jti"], payload["uid"])
+            ip, user_agent = request_meta(request)
+            log_activity(
+                topic="session",
+                action="logout",
+                result="succeed",
+                category="identity",
+                user_id=payload["uid"],
+                ip=ip,
+                user_agent=user_agent,
+            )
         except jwt.InvalidTokenError:
             pass  # already invalid; just clear the cookies
     token_cookies.clear_auth_cookies(response)

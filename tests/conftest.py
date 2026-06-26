@@ -24,6 +24,15 @@ from sqlalchemy.pool import NullPool
 _SEEDED_ROLES = ("superadmin", "admin", "member", "guest")
 
 
+@pytest.fixture(autouse=True)
+def _eager_celery() -> None:
+    """Run Celery tasks inline (no broker/worker) so audit writes happen in-test."""
+    from app.workers.celery_app import celery_app
+
+    celery_app.conf.task_always_eager = True
+    celery_app.conf.task_eager_propagates = True
+
+
 @pytest.fixture
 def fake_redis() -> redis.Redis:
     """An in-memory async Redis, so Redis-backed logic is unit-testable offline."""

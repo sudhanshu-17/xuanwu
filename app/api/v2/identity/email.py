@@ -1,8 +1,9 @@
 """Email verification."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.activity import log_activity, request_meta
 from app.core.config import settings
 from app.db.session import get_db
 from app.schemas.common import Envelope
@@ -30,7 +31,17 @@ async def generate_email_code(
 
 @router.post("/email/confirm_code", response_model=Envelope[UserOut])
 async def confirm_email_code(
-    payload: EmailConfirmIn, db: AsyncSession = Depends(get_db)
+    payload: EmailConfirmIn, request: Request, db: AsyncSession = Depends(get_db)
 ) -> Envelope[UserOut]:
     user = await auth_service.confirm_email(db, token=payload.token)
+    ip, user_agent = request_meta(request)
+    log_activity(
+        topic="email",
+        action="confirm",
+        result="succeed",
+        category="identity",
+        user_id=user.id,
+        ip=ip,
+        user_agent=user_agent,
+    )
     return Envelope[UserOut](data=UserOut.model_validate(user))

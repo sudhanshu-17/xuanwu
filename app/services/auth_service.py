@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
+from app.core.activity import log_activity
 from app.core.config import settings
 from app.core.errors import APIError
 from app.core.tokens import TokenPair, TokenService
@@ -90,33 +91,53 @@ async def login(
     password: str,
     otp_code: str | None,
     ip: str,
+    user_agent: str | None = None,
 ) -> tuple[User, TokenPair]:
+    def audit(action: str, result: str, *, user: User | None = None) -> None:
+        log_activity(
+            topic="session",
+            action=action,
+            result=result,
+            category="identity",
+            user_id=user.id if user else None,
+            ip=ip,
+            user_agent=user_agent,
+            data={"email": email},
+        )
+
     key = _lockout_key(email, ip)
     attempts = await redis_client.get(key)
     if attempts is not None and int(attempts) >= settings.login_max_attempts:
+        audit("login.locked", "denied")
         raise APIError(["identity.session.locked"], 429)
 
     user = await get_user_by_email(db, email)
     if user is None or not security.verify_password(password, user.password_digest):
         await _record_failure(redis_client, key)
+        audit("login", "failed", user=user)
         raise APIError(["identity.session.invalid_credentials"], 401)
     if user.state == UserState.banned.value:
+        audit("login", "denied", user=user)
         raise APIError(["identity.session.banned"], 401)
     if user.state == UserState.deleted.value:
+        audit("login", "denied", user=user)
         raise APIError(["identity.session.invalid_credentials"], 401)
 
     if user.otp:
         secret = user.otp_secret
         if not otp_code:
+            audit("login.otp", "failed", user=user)
             raise APIError(["identity.session.missing_otp"], 401)
         if secret is None or not await TOTPService(redis_client).verify(
             str(user.id), secret, otp_code
         ):
             await _record_failure(redis_client, key)
+            audit("login.otp", "failed", user=user)
             raise APIError(["identity.session.invalid_otp"], 401)
 
     await redis_client.delete(key)
     pair = await TokenService(redis_client).issue_pair(user_id=str(user.id), role=user.role)
+    audit("login", "succeed", user=user)
     return user, pair
 
 
