@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     authz_rules_path: str = "config/authz_rules.yml"
     permission_cache_ttl: int = 300  # 5 minutes
 
+    # --- Progressive verification (levels & state triggers) ---
+    auth_config_path: str = "config/auth.yml"
+
     # --- Email ---
     email_provider: str = "smtp"
     smtp_host: str = "mailhog"

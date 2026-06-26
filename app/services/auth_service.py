@@ -18,8 +18,8 @@ from app.core.config import settings
 from app.core.errors import APIError
 from app.core.tokens import TokenPair, TokenService
 from app.models.enums import UserState
-from app.models.label import Label
 from app.models.user import User
+from app.services import level_service
 from app.services.password_strength import password_errors
 from app.services.totp import TOTPService
 
@@ -131,17 +131,9 @@ async def confirm_email(db: AsyncSession, *, token: str) -> User:
     if user is None:
         raise APIError(["identity.email.invalid_token"], 422)
 
-    existing = await db.scalar(
-        select(Label).where(
-            Label.user_id == user.id, Label.key == "email", Label.scope == "private"
-        )
-    )
-    if existing is None:
-        db.add(Label(user_id=user.id, key="email", value="verified", scope="private"))
-    if user.state == UserState.pending.value:
-        user.state = UserState.active.value
-    await db.commit()
-    await db.refresh(user)
+    # Adding the email=verified label re-derives level (0→1) and activates a
+    # pending account — all of that lives in the progressive-verification engine.
+    await level_service.add_label(db, user, key="email", value="verified")
     return user
 
 

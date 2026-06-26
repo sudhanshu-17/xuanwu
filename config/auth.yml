@@ -1,0 +1,19 @@
+# Progressive-verification rules consumed by app/services/level_service.py.
+#
+# Levels are the source of truth in the `levels` table (seeded by
+# app/db/seeds.py); they are mirrored here only for reference/documentation.
+# A user's numeric level is the highest *contiguous* level for which they hold
+# the matching private label — a gap stops progression.
+levels:
+  - { id: 1, key: email, value: verified }
+  - { id: 2, key: phone, value: verified }
+  - { id: 3, key: document, value: verified }
+
+# State triggers: when a user holds a private label whose (key, value) matches a
+# trigger, their account `state` is forced to the mapped value. Triggers are
+# evaluated top-to-bottom; the first match wins. When no trigger matches, a
+# banned account is restored to active and a pending account with a verified
+# email is activated (see level_service.recompute_state). `deleted` is terminal.
+state_triggers:
+  - { key: banned, value: "true", state: banned }
+  - { key: deleted, value: "true", state: deleted }
