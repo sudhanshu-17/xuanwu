@@ -5,7 +5,7 @@ call :func:`clear` between cases.
 """
 
 from app.core.logging import get_logger
-from app.integrations.sms.base import SMSMessage
+from app.integrations.sms.base import SMSMessage, SMSProvider, verification_body
 
 logger = get_logger(__name__)
 
@@ -16,7 +16,8 @@ def clear() -> None:
     outbox.clear()
 
 
-class MockSMSProvider:
-    def send(self, message: SMSMessage) -> None:
-        outbox.append(message)
-        logger.info("sms_sent_mock", to=message.to)
+class MockSMSProvider(SMSProvider):
+    def send_code(self, *, number: str, code: str | None) -> None:
+        body = verification_body(code) if code else "verification initiated"
+        outbox.append(SMSMessage(to=number, body=body))
+        logger.info("sms_sent_mock", to=number)

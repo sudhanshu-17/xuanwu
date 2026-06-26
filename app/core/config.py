@@ -94,11 +94,13 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"  # base URL for links in emails
 
     # --- SMS ---
-    sms_provider: str = "mock"  # mock | twilio_sms | aws_sns
+    sms_provider: str = "mock"  # mock | twilio_sms | twilio_verify | aws_sns
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_from_number: str = ""  # E.164 sender, e.g. +61400000000
+    twilio_service_sid: str = ""  # Twilio Verify service SID (twilio_verify only)
     aws_region: str = "ap-southeast-2"
+    sms_content_template: str = "Your Rare Vintage verification code is {code}."
     sms_code_ttl: int = 600  # seconds a verification code stays valid
 
     # --- Object storage ---

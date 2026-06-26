@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.integrations.sms import get_provider, mock
 from app.integrations.sms.aws_sns import AWSSNSProvider
 from app.integrations.sms.twilio_sms import TwilioSMSProvider
+from app.integrations.sms.twilio_verify import TwilioVerifyProvider
 from httpx import AsyncClient
 
 IDENTITY = "/api/v2/xuanwu/identity"
@@ -28,6 +29,18 @@ def test_get_provider_honours_config(monkeypatch) -> None:  # type: ignore[no-un
     assert isinstance(get_provider(), TwilioSMSProvider)
     monkeypatch.setattr(settings, "sms_provider", "aws_sns")
     assert isinstance(get_provider(), AWSSNSProvider)
+    monkeypatch.setattr(settings, "sms_provider", "twilio_verify")
+    assert isinstance(get_provider(), TwilioVerifyProvider)
+
+
+def test_self_managed_providers_compare_stored_code() -> None:
+    """mock/twilio_sms/aws_sns verify by comparing the code we stored; Twilio
+    Verify defers to its own remote check (manages_codes)."""
+    assert get_provider().manages_codes is False  # mock, the default
+    assert get_provider().check_code(number="x", code="123456", expected="123456") is True
+    assert get_provider().check_code(number="x", code="000000", expected="123456") is False
+    assert get_provider().check_code(number="x", code="123456", expected=None) is False
+    assert TwilioVerifyProvider.manages_codes is True
 
 
 # --- delivery + verification (database-backed) -------------------------------
