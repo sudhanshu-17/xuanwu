@@ -13,7 +13,7 @@ celery_app = Celery(
     "xuanwu",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.workers.activity"],
+    include=["app.workers.activity", "app.workers.email"],
 )
 
 celery_app.conf.update(

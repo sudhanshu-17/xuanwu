@@ -112,7 +112,7 @@ warn_unused_configs = true
 warn_unreachable = true
 
 [[tool.mypy.overrides]]
-module = ["zxcvbn", "qrcode", "pyotp", "fakeredis", "celery", "geoip2.*"]
+module = ["zxcvbn", "qrcode", "pyotp", "fakeredis", "celery", "geoip2.*", "sendgrid", "sendgrid.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

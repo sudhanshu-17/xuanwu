@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.activity import log_activity, request_meta
 from app.core.config import settings
 from app.db.session import get_db
+from app.emails import dispatch
 from app.schemas.common import Envelope
 from app.schemas.identity import EmailCodeOut, EmailConfirmIn, EmailGenerateIn, UserOut
 from app.services import auth_service
@@ -19,8 +20,10 @@ async def generate_email_code(
 ) -> Envelope[EmailCodeOut]:
     user = await auth_service.get_user_by_email(db, payload.email)
     token = auth_service.make_email_token(user) if user else None
-    # Delivery is handled by the email worker (Phase 9); outside production we
-    # return the token so the flow is testable without a mail server.
+    if user and token:
+        dispatch.send_confirmation_email(user, token)
+    # Delivery is handled by the email worker; outside production we also return
+    # the token so the flow is testable without a mail server.
     return Envelope[EmailCodeOut](
         data=EmailCodeOut(
             message="If the account exists, a confirmation link has been sent.",

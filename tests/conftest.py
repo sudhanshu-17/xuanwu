@@ -26,11 +26,21 @@ _SEEDED_ROLES = ("superadmin", "admin", "member", "guest")
 
 @pytest.fixture(autouse=True)
 def _eager_celery() -> None:
-    """Run Celery tasks inline (no broker/worker) so audit writes happen in-test."""
+    """Run Celery tasks inline (no broker/worker) so audit/email work happens in-test."""
     from app.workers.celery_app import celery_app
 
     celery_app.conf.task_always_eager = True
     celery_app.conf.task_eager_propagates = True
+
+
+@pytest.fixture(autouse=True)
+def _mock_email() -> None:
+    """Capture outgoing email in memory and reset the outbox between tests."""
+    from app.core.config import settings
+    from app.integrations.email import mock
+
+    settings.email_provider = "mock"
+    mock.clear()
 
 
 @pytest.fixture

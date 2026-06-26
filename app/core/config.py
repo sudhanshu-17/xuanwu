@@ -81,11 +81,17 @@ class Settings(BaseSettings):
     auth_config_path: str = "config/auth.yml"
 
     # --- Email ---
-    email_provider: str = "smtp"
+    email_provider: str = "smtp"  # mock | smtp | sendgrid
     smtp_host: str = "mailhog"
     smtp_port: int = 1025
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = False
     email_from: str = "no-reply@rarevintage.com.au"
+    email_from_name: str = "Rare Vintage"
+    email_default_language: str = "en"
     sendgrid_api_key: str = ""
+    frontend_url: str = "http://localhost:3000"  # base URL for links in emails
 
     # --- SMS ---
     sms_provider: str = "mock"

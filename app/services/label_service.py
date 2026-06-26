@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import APIError
+from app.emails import dispatch
 from app.models.enums import LabelScope
 from app.models.label import Label
 from app.models.user import User
@@ -36,4 +37,5 @@ async def create_public_label(db: AsyncSession, user: User, *, key: str, value: 
     db.add(label)
     await db.commit()
     await db.refresh(label)
+    dispatch.send_label_email(user, key=key, value=value)
     return label

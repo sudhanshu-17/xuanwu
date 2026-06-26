@@ -18,6 +18,7 @@ from app.core.activity import log_activity
 from app.core.config import settings
 from app.core.errors import APIError
 from app.core.tokens import TokenPair, TokenService
+from app.emails import dispatch
 from app.models.enums import UserState
 from app.models.user import User
 from app.services import level_service
@@ -59,6 +60,7 @@ async def register(db: AsyncSession, *, email: str, password: str, username: str
     db.add(user)
     await db.commit()
     await db.refresh(user)
+    dispatch.send_confirmation_email(user, make_email_token(user))
     return user
 
 
@@ -138,6 +140,7 @@ async def login(
     await redis_client.delete(key)
     pair = await TokenService(redis_client).issue_pair(user_id=str(user.id), role=user.role)
     audit("login", "succeed", user=user)
+    dispatch.send_session_create_email(user, ip=ip, user_agent=user_agent)
     return user, pair
 
 
@@ -166,6 +169,7 @@ async def request_password_reset(db: AsyncSession, *, email: str) -> str | None:
     token, _ = security.create_token(
         user_id=str(user.id), token_type=PASSWORD_RESET_TYPE, ttl=_PASSWORD_TOKEN_TTL
     )
+    dispatch.send_password_reset_email(user, token)
     return token
 
 
