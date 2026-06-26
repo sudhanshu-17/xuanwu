@@ -33,6 +33,17 @@ async def get_redis() -> redis.Redis:
     return redis_client
 
 
+async def restriction_guard(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    redis_dep: redis.Redis = Depends(get_redis),
+) -> None:
+    """Enforce IP/geo restrictions before any API handler runs."""
+    from app.core import restrictions
+
+    await restrictions.evaluate(request, redis_dep, db)
+
+
 def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 

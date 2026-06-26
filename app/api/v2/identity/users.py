@@ -25,7 +25,11 @@ async def create_user(
     redis_client: redis.Redis = Depends(get_redis),
 ) -> Envelope[SessionOut]:
     user = await auth_service.register(
-        db, email=payload.email, password=payload.password, username=payload.username
+        db,
+        email=payload.email,
+        password=payload.password,
+        username=payload.username,
+        captcha_response=payload.captcha_response,
     )
     ip, user_agent = request_meta(request)
     log_activity(

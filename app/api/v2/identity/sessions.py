@@ -11,6 +11,7 @@ from app.core import tokens as token_cookies
 from app.core.activity import log_activity, request_meta
 from app.core.config import settings
 from app.core.errors import APIError
+from app.core.ratelimit import limiter
 from app.core.tokens import TokenService
 from app.db.session import get_db
 from app.schemas.common import Envelope, Message
@@ -21,6 +22,7 @@ router = APIRouter()
 
 
 @router.post("/sessions", response_model=Envelope[SessionOut])
+@limiter.limit(settings.rate_limit_login)
 async def create_session(
     payload: LoginIn,
     request: Request,
@@ -36,6 +38,7 @@ async def create_session(
         otp_code=payload.otp_code,
         ip=client_ip(request),
         user_agent=request.headers.get("user-agent"),
+        captcha_response=payload.captcha_response,
     )
     token_cookies.set_auth_cookies(response, pair)
     return Envelope[SessionOut](

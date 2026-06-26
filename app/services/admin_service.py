@@ -5,6 +5,7 @@ Ported from nebryx's admin routes. Filtering uses the query builders in
 verifying a document (etc.) re-derives the user's level and state.
 """
 
+import ipaddress
 import uuid
 from typing import TypeVar
 
@@ -13,21 +14,36 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core import restrictions as restrictions_engine
 from app.core.authorize import invalidate_role_cache
 from app.core.errors import APIError
 from app.core.tokens import TokenService
 from app.models.activity import Activity
-from app.models.enums import PermissionAction, UserState
+from app.models.enums import (
+    PermissionAction,
+    RestrictionCategory,
+    RestrictionScope,
+    RestrictionState,
+    UserState,
+)
 from app.models.permission import Permission
+from app.models.restriction import Restriction
 from app.models.user import User
 from app.queries.activity_filter import ActivityFilter, build_activity_query, user_lookup_query
 from app.queries.user_filter import UserFilter, build_user_query
-from app.schemas.admin import PermissionCreateIn, PermissionUpdateIn
+from app.schemas.admin import (
+    PermissionCreateIn,
+    PermissionUpdateIn,
+    RestrictionCreateIn,
+    RestrictionUpdateIn,
+)
 from app.services import level_service
 
 _Row = TypeVar("_Row")
 _VALID_VERBS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE", "ALL"})
 _VALID_ACTIONS = frozenset({a.value for a in PermissionAction})
+_VALID_CATEGORIES = frozenset({c.value for c in RestrictionCategory})
+_VALID_SCOPES = frozenset({s.value for s in RestrictionScope})
 _LOCKING_STATES = frozenset(
     {UserState.banned.value, UserState.locked.value, UserState.deleted.value}
 )
@@ -206,3 +222,78 @@ async def list_activities(
             date_to=f.date_to,
         )
     return await _paginate(db, build_activity_query(f), page=page, limit=limit)
+
+
+# --- restrictions ------------------------------------------------------------
+def _validate_restriction(category: str, scope: str, value: str) -> None:
+    if category not in _VALID_CATEGORIES:
+        raise APIError(["admin.restriction.invalid_category"], 422)
+    if scope not in _VALID_SCOPES:
+        raise APIError(["admin.restriction.invalid_scope"], 422)
+    try:
+        if scope == RestrictionScope.ip.value:
+            ipaddress.ip_address(value)
+        elif scope == RestrictionScope.ip_subnet.value:
+            ipaddress.ip_network(value, strict=False)
+    except ValueError as exc:
+        raise APIError(["admin.restriction.invalid_value"], 422) from exc
+
+
+async def list_restrictions(
+    db: AsyncSession, *, page: int, limit: int
+) -> tuple[list[Restriction], int]:
+    stmt = select(Restriction).order_by(Restriction.created_at.asc())
+    return await _paginate(db, stmt, page=page, limit=limit)
+
+
+async def create_restriction(
+    db: AsyncSession, redis_client: redis.Redis, data: RestrictionCreateIn
+) -> Restriction:
+    _validate_restriction(data.category, data.scope, data.value)
+    restriction = Restriction(
+        category=data.category,
+        scope=data.scope,
+        value=data.value,
+        code=restrictions_engine.assign_code(data.category, data.scope, data.code),
+        state=data.state,
+    )
+    db.add(restriction)
+    await db.commit()
+    await db.refresh(restriction)
+    await restrictions_engine.invalidate_cache(redis_client)
+    return restriction
+
+
+async def update_restriction(
+    db: AsyncSession,
+    redis_client: redis.Redis,
+    restriction_id: uuid.UUID,
+    data: RestrictionUpdateIn,
+) -> Restriction:
+    restriction = await db.get(Restriction, restriction_id)
+    if restriction is None:
+        raise APIError(["admin.restriction.not_found"], 404)
+    if data.value is not None:
+        _validate_restriction(restriction.category, restriction.scope, data.value)
+        restriction.value = data.value
+    if data.code is not None:
+        restriction.code = data.code
+    if data.state is not None:
+        if data.state not in {s.value for s in RestrictionState}:
+            raise APIError(["admin.restriction.invalid_state"], 422)
+        restriction.state = data.state
+    await db.commit()
+    await db.refresh(restriction)
+    await restrictions_engine.invalidate_cache(redis_client)
+    return restriction
+
+
+async def delete_restriction(
+    db: AsyncSession, redis_client: redis.Redis, restriction_id: uuid.UUID
+) -> None:
+    restriction = await db.get(Restriction, restriction_id)
+    if restriction is None:
+        raise APIError(["admin.restriction.not_found"], 404)
+    await db.delete(restriction)
+    await db.commit()
+    await restrictions_engine.invalidate_cache(redis_client)

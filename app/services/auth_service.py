@@ -19,6 +19,7 @@ from app.core.config import settings
 from app.core.errors import APIError
 from app.core.tokens import TokenPair, TokenService
 from app.emails import dispatch
+from app.integrations.recaptcha import verify_captcha
 from app.models.enums import UserState
 from app.models.user import User
 from app.services import level_service
@@ -37,7 +38,16 @@ async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
 
 
 # --- registration ------------------------------------------------------------
-async def register(db: AsyncSession, *, email: str, password: str, username: str | None) -> User:
+async def register(
+    db: AsyncSession,
+    *,
+    email: str,
+    password: str,
+    username: str | None,
+    captcha_response: str | None = None,
+) -> User:
+    if not await verify_captcha(captcha_response):
+        raise APIError(["identity.captcha.invalid"], 422)
     errors = password_errors(password)
     if errors:
         raise APIError(errors, 422)
@@ -94,7 +104,11 @@ async def login(
     otp_code: str | None,
     ip: str,
     user_agent: str | None = None,
+    captcha_response: str | None = None,
 ) -> tuple[User, TokenPair]:
+    if not await verify_captcha(captcha_response):
+        raise APIError(["identity.captcha.invalid"], 422)
+
     def audit(action: str, result: str, *, user: User | None = None) -> None:
         log_activity(
             topic="session",

@@ -61,12 +61,14 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: str
     username: str | None = None
+    captcha_response: str | None = None
 
 
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
     otp_code: str | None = None
+    captcha_response: str | None = None
 
 
 class EmailGenerateIn(BaseModel):

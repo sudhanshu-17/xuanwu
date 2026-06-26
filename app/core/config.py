@@ -122,9 +122,15 @@ class Settings(BaseSettings):
         return [e.strip().lower() for e in self.upload_extensions.split(",") if e.strip()]
 
     # --- Captcha ---
-    captcha_provider: str = "none"
+    captcha_provider: str = "none"  # none | recaptcha
     recaptcha_secret: str = ""
     recaptcha_site_key: str = ""
+
+    # --- Rate limiting & hardening ---
+    rate_limit_enabled: bool = True
+    rate_limit_default: str = "300/minute"  # global per-IP ceiling
+    rate_limit_login: str = "10/minute"  # extra ceiling on the login endpoint
+    hsts_enabled: bool = False  # send Strict-Transport-Security (set True behind HTTPS)
 
     @property
     def cors_origins_list(self) -> list[str]:

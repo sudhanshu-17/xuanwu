@@ -62,6 +62,14 @@ def _local_storage(tmp_path: object) -> None:
     settings.upload_dir = str(tmp_path)
 
 
+@pytest.fixture(autouse=True)
+def _no_rate_limit() -> None:
+    """Disable the global rate limiter so the suite isn't throttled."""
+    from app.core.ratelimit import limiter
+
+    limiter.enabled = False
+
+
 @pytest.fixture
 def fake_redis() -> redis.Redis:
     """An in-memory async Redis, so Redis-backed logic is unit-testable offline."""

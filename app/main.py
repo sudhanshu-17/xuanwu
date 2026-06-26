@@ -2,17 +2,28 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.docs import setup_docs
 from app.api.v2.router import api_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
+from app.core.ratelimit import limiter, rate_limit_handler
 from app.core.redis import check_redis
 from app.db.session import check_database
+
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-XSS-Protection": "0",
+}
 
 logger = get_logger(__name__)
 
@@ -50,6 +61,22 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Per-IP rate limiting (slowapi) shared across workers via Redis.
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+    app.add_middleware(SlowAPIMiddleware)
+
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next: Any) -> Response:
+        response: Response = await call_next(request)
+        for header, value in _SECURITY_HEADERS.items():
+            response.headers.setdefault(header, value)
+        if settings.hsts_enabled:
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
+            )
+        return response
 
     register_exception_handlers(app)
     app.include_router(api_router)

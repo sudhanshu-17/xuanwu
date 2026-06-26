@@ -64,6 +64,33 @@ class PermissionUpdateIn(BaseModel):
     topic: str | None = None
 
 
+# --- restrictions ------------------------------------------------------------
+class RestrictionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    category: str
+    scope: str
+    value: str
+    code: int | None
+    state: str
+    created_at: datetime
+
+
+class RestrictionCreateIn(BaseModel):
+    category: str
+    scope: str
+    value: str
+    code: int | None = None
+    state: str = "enabled"
+
+
+class RestrictionUpdateIn(BaseModel):
+    value: str | None = None
+    code: int | None = None
+    state: str | None = None
+
+
 # --- activities --------------------------------------------------------------
 class ActivityOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
