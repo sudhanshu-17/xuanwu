@@ -110,21 +110,27 @@ async def add_label(
     *,
     key: str,
     value: str = "verified",
+    scope: str = SYSTEM_SCOPE,
     redis_client: redis.Redis | None = None,
 ) -> Label:
-    """Add or update a private system label, then re-derive level and state.
+    """Add or update a label, then re-derive level and state for private labels.
 
-    Idempotent on ``(user, key)``: an existing label's value is updated in place.
+    Idempotent on ``(user, key, scope)``: an existing label's value is updated in
+    place. Only private labels affect level/state; public ones just persist.
     """
     label = await db.scalar(
-        select(Label).where(Label.user_id == user.id, Label.key == key, Label.scope == SYSTEM_SCOPE)
+        select(Label).where(Label.user_id == user.id, Label.key == key, Label.scope == scope)
     )
     if label is None:
-        label = Label(user_id=user.id, key=key, value=value, scope=SYSTEM_SCOPE)
+        label = Label(user_id=user.id, key=key, value=value, scope=scope)
         db.add(label)
     else:
         label.value = value
-    await _sync(db, user, redis_client)
+    if scope == SYSTEM_SCOPE:
+        await _sync(db, user, redis_client)
+    else:
+        await db.commit()
+        await db.refresh(label)
     return label
 
 
@@ -133,12 +139,16 @@ async def remove_label(
     user: User,
     *,
     key: str,
+    scope: str = SYSTEM_SCOPE,
     redis_client: redis.Redis | None = None,
 ) -> None:
-    """Remove a private system label (if present), then re-derive level and state."""
+    """Remove a label (if present), then re-derive level and state for private ones."""
     label = await db.scalar(
-        select(Label).where(Label.user_id == user.id, Label.key == key, Label.scope == SYSTEM_SCOPE)
+        select(Label).where(Label.user_id == user.id, Label.key == key, Label.scope == scope)
     )
     if label is not None:
         await db.delete(label)
-    await _sync(db, user, redis_client)
+    if scope == SYSTEM_SCOPE:
+        await _sync(db, user, redis_client)
+    else:
+        await db.commit()

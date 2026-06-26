@@ -126,3 +126,11 @@ async def require_superadmin(user: User = Depends(current_user)) -> User:
     if user.role != "superadmin":
         raise APIError(["authz.forbidden"], 403)
     return user
+
+
+async def superadmin_authorized(user: User = Depends(authorized_user)) -> User:
+    """Full RBAC + CSRF authorization, then restrict to superadmin (e.g. for
+    permission management)."""
+    if user.role != "superadmin":
+        raise APIError(["authz.forbidden"], 403)
+    return user

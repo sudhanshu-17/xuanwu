@@ -16,3 +16,12 @@ class Envelope(BaseModel, Generic[DataT]):
 
 class Message(BaseModel):
     message: str
+
+
+class Page(BaseModel, Generic[DataT]):
+    """A paginated slice of a collection."""
+
+    items: list[DataT]
+    total: int
+    page: int
+    limit: int
