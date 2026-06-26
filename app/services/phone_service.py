@@ -1,5 +1,6 @@
-"""Phone management. SMS delivery is wired in Phase 10; the code is generated
-and stored here so verification works end to end in the meantime."""
+"""Phone management: store a number (encrypted + blind-indexed), send a
+verification code by SMS, and on success record the ``phone=verified`` label
+through the progressive-verification engine."""
 
 import secrets
 import uuid
@@ -9,14 +10,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import APIError
-from app.models.label import Label
 from app.models.phone import Phone
 from app.models.user import User
+from app.services import level_service
 from app.utils.blind_index import blind_index
+from app.workers.sms import send_sms
 
 
 def _generate_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def _verification_body(code: str) -> str:
+    return f"Your Rare Vintage verification code is {code}."
 
 
 async def list_phones(db: AsyncSession, user_id: uuid.UUID) -> list[Phone]:
@@ -38,6 +44,7 @@ async def create_phone(
     db.add(phone)
     await db.commit()
     await db.refresh(phone)
+    send_sms.delay(to=number, body=_verification_body(code))
     return phone, code
 
 
@@ -52,13 +59,8 @@ async def verify_phone(db: AsyncSession, user: User, *, phone_id: uuid.UUID, cod
 
     phone.validated_at = datetime.now(UTC)
     phone.code = None
-    existing = await db.scalar(
-        select(Label).where(
-            Label.user_id == user.id, Label.key == "phone", Label.scope == "private"
-        )
-    )
-    if existing is None:
-        db.add(Label(user_id=user.id, key="phone", value="verified", scope="private"))
-    await db.commit()
+    # The level engine commits the pending phone changes, adds the private
+    # phone=verified label, and re-derives the user's level (and state).
+    await level_service.add_label(db, user, key="phone", value="verified")
     await db.refresh(phone)
     return phone

@@ -43,6 +43,16 @@ def _mock_email() -> None:
     mock.clear()
 
 
+@pytest.fixture(autouse=True)
+def _mock_sms() -> None:
+    """Capture outgoing SMS in memory and reset the outbox between tests."""
+    from app.core.config import settings
+    from app.integrations.sms import mock
+
+    settings.sms_provider = "mock"
+    mock.clear()
+
+
 @pytest.fixture
 def fake_redis() -> redis.Redis:
     """An in-memory async Redis, so Redis-backed logic is unit-testable offline."""
