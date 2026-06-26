@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     email_from: str = "no-reply@rarevintage.com.au"
     email_from_name: str = "Rare Vintage"
     email_default_language: str = "en"
+    mailer_config_path: str = "config/mailer.yml"  # event-key → template/subject registry
     sendgrid_api_key: str = ""
     frontend_url: str = "http://localhost:3000"  # base URL for links in emails
 

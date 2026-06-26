@@ -3,7 +3,7 @@
 import uuid
 
 from app.core.config import settings
-from app.emails import render_email
+from app.emails import render_event
 from app.integrations.email import get_provider, mock
 from app.integrations.email.sendgrid_provider import SendGridEmailProvider
 from app.integrations.email.smtp import SMTPEmailProvider
@@ -20,7 +20,7 @@ def _email() -> str:
 # --- rendering (no database) -------------------------------------------------
 def test_confirmation_email_is_branded() -> None:
     url = "https://app.example.com/confirm-email?token=abc"
-    rendered = render_email("confirmation", "en", {"confirmation_url": url})
+    rendered = render_event("email_confirmation", "en", {"confirmation_url": url})
     assert rendered.subject == "Confirm your Rare Vintage email"
     assert "#b8923e" in rendered.html  # gold accent (EML-09)
     assert url in rendered.html
@@ -30,7 +30,7 @@ def test_confirmation_email_is_branded() -> None:
 
 
 def test_unknown_language_falls_back_to_english() -> None:
-    rendered = render_email("password_reset", "fr", {"reset_url": "https://x/y"})
+    rendered = render_event("password_reset", "fr", {"reset_url": "https://x/y"})
     assert rendered.subject == "Reset your Rare Vintage password"
     assert "https://x/y" in rendered.html
 
