@@ -11,6 +11,7 @@ class UserState(str, enum.Enum):
     pending = "pending"
     active = "active"
     banned = "banned"
+    locked = "locked"
     deleted = "deleted"
 
 

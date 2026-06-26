@@ -23,6 +23,10 @@ from app.services.api_key_verifier import APIKeyVerifier
 
 ADMIN_ROLES = frozenset({"admin", "superadmin"})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+# Non-authenticatable states (banned/locked/deleted); pending may still act.
+_BLOCKED_STATES = frozenset(
+    {UserState.banned.value, UserState.locked.value, UserState.deleted.value}
+)
 
 
 async def get_redis() -> redis.Redis:
@@ -53,7 +57,7 @@ async def current_user(request: Request, db: AsyncSession = Depends(get_db)) -> 
     except jwt.InvalidTokenError as exc:
         raise APIError(["authz.invalid_token"], 401) from exc
     user = await db.get(User, uuid.UUID(payload["uid"]))
-    if user is None or user.state in {UserState.banned.value, UserState.deleted.value}:
+    if user is None or user.state in _BLOCKED_STATES:
         raise APIError(["authz.invalid_session"], 401)
     return user
 

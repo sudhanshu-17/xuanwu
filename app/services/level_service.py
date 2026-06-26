@@ -1,19 +1,18 @@
-"""Progressive-verification engine: labels → level + state.
+"""Progressive-verification engine — a port of Barong's User#update_level and
+User#update_state (exchange_auth/app/models/user.rb) plus its barong.yml
+``activation_requirements`` / ``state_triggers``.
 
-Labels are the raw events ("email=verified", "banned=true"). This module is the
-single place that translates the set of *private* labels a user holds into their
-numeric ``level`` (driven by the ``levels`` table) and account ``state`` (driven
-by ``config/auth.yml`` ``state_triggers``).
-
-It is invoked explicitly by the services that add or remove labels — there are
-no hidden ORM callbacks (ARCHITECTURE §3.1). A label change always flows through
-:func:`add_label` / :func:`remove_label`, which re-derive level and state and,
-when an account becomes banned or deleted, revoke every active session.
+Labels are the raw events ("email=verified", "ban=true"). This module is the
+single place that derives a user's numeric ``level`` (from the ``levels`` table)
+and account ``state`` (from ``config/auth.yml``) out of the *private* labels they
+hold. Barong runs this from ``after_commit`` callbacks on Label; we call it
+explicitly from the services that mutate labels (ARCHITECTURE §3.1 — no hidden
+ORM callbacks), but the algorithm matches Barong exactly.
 """
 
-from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 import redis.asyncio as redis
 import yaml
@@ -29,86 +28,76 @@ from app.models.user import User
 
 # System labels live in the private scope; public labels never affect level/state.
 SYSTEM_SCOPE = LabelScope.private.value
-_LOCKING_STATES = frozenset({UserState.banned.value, UserState.deleted.value})
-
-
-@dataclass(frozen=True)
-class StateTrigger:
-    key: str
-    value: str
-    state: str
+# States that block authentication → revoke the user's active sessions.
+_LOCKING_STATES = frozenset(
+    {UserState.banned.value, UserState.locked.value, UserState.deleted.value}
+)
 
 
 @lru_cache
-def load_state_triggers() -> tuple[StateTrigger, ...]:
-    """State triggers from ``config/auth.yml``, in evaluation order."""
+def _auth_config() -> dict[str, Any]:
     path = Path(settings.auth_config_path)
     if not path.exists():
-        return ()
-    data = yaml.safe_load(path.read_text()) or {}
-    triggers = []
-    for raw in data.get("state_triggers") or []:
-        triggers.append(
-            StateTrigger(
-                key=str(raw["key"]),
-                value=str(raw["value"]),
-                state=str(raw["state"]),
-            )
-        )
-    return tuple(triggers)
+        return {}
+    data: dict[str, Any] = yaml.safe_load(path.read_text()) or {}
+    return data
 
 
-async def _held_labels(db: AsyncSession, user_id: object) -> set[tuple[str, str]]:
-    """The (key, value) pairs of every private label the user currently holds."""
+def activation_requirements() -> dict[str, str]:
+    reqs = _auth_config().get("activation_requirements") or {}
+    return {str(k): str(v) for k, v in reqs.items()}
+
+
+def state_triggers() -> dict[str, list[str]]:
+    triggers = _auth_config().get("state_triggers") or {}
+    return {str(state): [str(p) for p in prefixes] for state, prefixes in triggers.items()}
+
+
+async def _private_labels(db: AsyncSession, user_id: object) -> dict[str, str]:
+    """The user's private labels as a ``{key: value}`` hash (key is unique per
+    user within the private scope)."""
     rows = await db.scalars(
         select(Label).where(Label.user_id == user_id, Label.scope == SYSTEM_SCOPE)
     )
-    return {(row.key, row.value) for row in rows.all()}
+    return {row.key: row.value for row in rows.all()}
 
 
-async def recompute_level(db: AsyncSession, user: User) -> None:
-    """Set ``user.level`` to the highest contiguous verified level.
-
-    Levels are ordered by id; the first missing label stops progression, so a
-    user with email+document but no phone stays at level 1, not 3.
-    """
-    held = await _held_labels(db, user.id)
-    levels = (await db.scalars(select(Level).order_by(Level.id))).all()
-    new_level = 0
-    for level in levels:
-        if (level.key, level.value) in held:
-            new_level = level.id
-        else:
-            break
-    user.level = new_level
+async def recompute_level(db: AsyncSession, user: User, labels: dict[str, str]) -> None:
+    """Port of ``User#update_level``: the level is the id of the highest ``levels``
+    row whose ``key:value`` the user holds — not necessarily contiguous."""
+    tags = {f"{key}:{value}" for key, value in labels.items()}
+    user_level = 0
+    for level in (await db.scalars(select(Level).order_by(Level.id))).all():
+        if f"{level.key}:{level.value}" in tags:
+            user_level = level.id
+    user.level = user_level
 
 
-async def recompute_state(db: AsyncSession, user: User) -> bool:
-    """Re-derive ``user.state`` from state triggers.
+async def recompute_state(db: AsyncSession, user: User, labels: dict[str, str]) -> bool:
+    """Port of ``User#update_state``: default ``pending``; ``active`` when the
+    activation requirements are a subset of the user's labels; then state
+    triggers override by label-key prefix (last match wins). Returns ``True`` when
+    the resulting state locks the account so the caller can revoke sessions."""
+    resulting = UserState.pending.value
+    requirements = activation_requirements()
+    if all(labels.get(key) == value for key, value in requirements.items()):
+        resulting = UserState.active.value
 
-    Returns ``True`` when the resulting state locks the account (banned/deleted),
-    signalling the caller to revoke the user's sessions.
-    """
-    held = await _held_labels(db, user.id)
-    for trigger in load_state_triggers():
-        if (trigger.key, trigger.value) in held:
-            user.state = trigger.state
-            return trigger.state in _LOCKING_STATES
+    for state, prefixes in state_triggers().items():
+        for prefix in prefixes:
+            if any(key.startswith(prefix) for key in labels):
+                resulting = state
 
-    # No locking trigger is active: lift a ban, and activate a pending account
-    # once its email is verified. `deleted` is terminal and never auto-restored.
-    lift_ban = user.state == UserState.banned.value
-    activate = user.state == UserState.pending.value and ("email", "verified") in held
-    if lift_ban or activate:
-        user.state = UserState.active.value
-    return False
+    user.state = resulting
+    return resulting in _LOCKING_STATES
 
 
 async def _sync(db: AsyncSession, user: User, redis_client: redis.Redis | None) -> None:
     """Flush the pending label change, re-derive level + state, persist, revoke."""
     await db.flush()  # make the label add/remove visible to the recompute queries
-    await recompute_level(db, user)
-    locked = await recompute_state(db, user)
+    labels = await _private_labels(db, user.id)
+    await recompute_level(db, user, labels)
+    locked = await recompute_state(db, user, labels)
     await db.commit()
     await db.refresh(user)
     if locked and redis_client is not None:

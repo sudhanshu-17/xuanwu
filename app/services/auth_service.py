@@ -123,7 +123,10 @@ async def login(
         raise APIError(["identity.session.banned"], 401)
     if user.state == UserState.deleted.value:
         audit("login", "denied", user=user)
-        raise APIError(["identity.session.invalid_credentials"], 401)
+        raise APIError(["identity.session.deleted"], 401)
+    if user.state not in {UserState.active.value, UserState.pending.value}:
+        audit("login", "denied", user=user)
+        raise APIError(["identity.session.not_active"], 401)
 
     if user.otp:
         secret = user.otp_secret
