@@ -105,12 +105,21 @@ class Settings(BaseSettings):
     sms_code_ttl: int = 600  # seconds a verification code stays valid
 
     # --- Object storage ---
-    storage_provider: str = "local"
-    s3_endpoint_url: str = "http://minio:9000"
+    storage_provider: str = "local"  # local | s3
+    upload_dir: str = "uploads"  # local provider base directory
+    upload_max_size: int = 10_485_760  # 10 MB
+    upload_extensions: str = "pdf,jpg,jpeg,png"  # comma-separated allowlist
+    s3_endpoint_url: str = "http://minio:9000"  # blank for real AWS S3
     s3_access_key: str = ""
     s3_secret_key: str = ""
     s3_bucket: str = "xuanwu-dev"
     s3_region: str = "us-east-1"
+    s3_url_expiration: int = 3600  # presigned URL lifetime (seconds)
+    s3_sse: str = "AES256"  # server-side encryption; blank to disable (e.g. MinIO)
+
+    @property
+    def upload_extensions_list(self) -> list[str]:
+        return [e.strip().lower() for e in self.upload_extensions.split(",") if e.strip()]
 
     # --- Captcha ---
     captcha_provider: str = "none"

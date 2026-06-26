@@ -118,7 +118,8 @@ async def test_documents_hide_number(client: AsyncClient) -> None:
     _, csrf = await _register(client)
     created = await client.post(
         f"{RESOURCE}/documents",
-        json={"doc_type": "passport", "doc_number": "X1234567"},
+        data={"doc_type": "passport", "doc_number": "X1234567"},
+        files={"upload": ("passport.pdf", b"%PDF-1.4 bytes", "application/pdf")},
         headers=_csrf(csrf),
     )
     assert created.status_code == 201

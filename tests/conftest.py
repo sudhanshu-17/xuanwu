@@ -53,6 +53,15 @@ def _mock_sms() -> None:
     mock.clear()
 
 
+@pytest.fixture(autouse=True)
+def _local_storage(tmp_path: object) -> None:
+    """Store uploads under a throwaway temp directory, not the repo tree."""
+    from app.core.config import settings
+
+    settings.storage_provider = "local"
+    settings.upload_dir = str(tmp_path)
+
+
 @pytest.fixture
 def fake_redis() -> redis.Redis:
     """An in-memory async Redis, so Redis-backed logic is unit-testable offline."""

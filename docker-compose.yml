@@ -44,6 +44,15 @@ services:
     # SMTP on 1025 (matches SMTP_PORT); web UI on 8025.
     ports: ["${MAILHOG_SMTP_PORT:-1025}:1025", "${MAILHOG_UI_PORT:-8025}:8025"]
 
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+    ports: ["${MINIO_PORT:-9000}:9000", "${MINIO_CONSOLE_PORT:-9001}:9001"]
+    volumes: ["miniodata:/data"]
+
   api:
     build: .
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -69,3 +78,4 @@ services:
 
 volumes:
   mysqldata: {}
+  miniodata: {}

@@ -83,12 +83,7 @@ class PhoneVerifyIn(BaseModel):
 
 
 # --- documents ---------------------------------------------------------------
-class DocumentIn(BaseModel):
-    doc_type: str
-    doc_number: str
-    doc_expire: date | None = None
-
-
+# Document creation is multipart (file + form fields), parsed in the route.
 class DocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
