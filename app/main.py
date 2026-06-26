@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.docs import setup_docs
 from app.api.v2.router import api_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
@@ -35,6 +36,11 @@ def create_app() -> FastAPI:
         version="0.1.0",
         description="Standalone authentication & authorization server.",
         lifespan=lifespan,
+        # Defaults are disabled and replaced by the role-aware docs below, so
+        # /admin/* only appears in the schema for a logged-in admin.
+        openapi_url=None,
+        docs_url=None,
+        redoc_url=None,
     )
 
     app.add_middleware(
@@ -47,6 +53,7 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
     app.include_router(api_router)
+    setup_docs(app)
 
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, str]:
