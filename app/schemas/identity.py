@@ -56,6 +56,12 @@ class ConfigsOut(BaseModel):
     recaptcha_site_key: str | None = None
 
 
+class VersionOut(BaseModel):
+    version: str
+    git_tag: str
+    git_sha: str
+
+
 # --- requests ----------------------------------------------------------------
 class RegisterIn(BaseModel):
     email: EmailStr

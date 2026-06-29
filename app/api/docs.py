@@ -26,6 +26,66 @@ from app.core.config import settings
 # Admin routes live under the API namespace + ``/admin``.
 ADMIN_PATH_PREFIX = "/api/v2/xuanwu/admin"
 
+# Tag descriptions shown in Swagger UI / ReDoc.
+OPENAPI_TAGS: list[dict[str, str]] = [
+    {"name": "public", "description": "Unauthenticated health, version and client-safe config."},
+    {"name": "identity", "description": "Registration, login, logout, email/password flows."},
+    {
+        "name": "resource",
+        "description": "The authenticated user acting on their own account "
+        "(profile, phones, documents, 2FA, API keys, data storage).",
+    },
+    {
+        "name": "admin",
+        "description": "Staff administration of users, permissions, activities "
+        "and restrictions (admin/superadmin only).",
+    },
+    {"name": "health", "description": "Liveness and readiness probes."},
+]
+
+# Auth schemes documented for clients. These describe how to authenticate; the
+# actual enforcement lives in the route dependencies (RBAC, CSRF, HMAC).
+SECURITY_SCHEMES: dict[str, dict[str, str]] = {
+    "AccessCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": settings.access_cookie_name,
+        "description": "RS256 JWT access token set as an httpOnly cookie at login "
+        "(15 min). Rotated via /identity/sessions/refresh.",
+    },
+    "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Access token as an Authorization: Bearer header, for tooling/scripts.",
+    },
+    "CsrfToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-CSRF-Token",
+        "description": "Double-submit CSRF token (echoes the readable CSRF cookie) — "
+        "required on cookie-authenticated state-changing requests.",
+    },
+    "ApiKeyId": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Auth-Apikey",
+        "description": "API key identifier (kid) for programmatic HMAC auth.",
+    },
+    "ApiKeyNonce": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Auth-Nonce",
+        "description": "Per-request nonce (unix ms) for the HMAC signature; ~5s replay window.",
+    },
+    "ApiKeySignature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Auth-Signature",
+        "description": "HMAC-SHA256 of nonce+kid signed with the API key secret.",
+    },
+}
+
 
 def _is_admin_request(request: Request) -> bool:
     token = request.cookies.get(settings.access_cookie_name)
@@ -51,12 +111,15 @@ def setup_docs(app: FastAPI) -> None:
 
     def full_schema() -> dict[str, Any]:
         if not app.openapi_schema:
-            app.openapi_schema = get_openapi(
+            schema = get_openapi(
                 title=app.title,
                 version=app.version,
                 description=app.description,
                 routes=app.routes,
+                tags=OPENAPI_TAGS,
             )
+            schema.setdefault("components", {})["securitySchemes"] = SECURITY_SCHEMES
+            app.openapi_schema = schema
         return app.openapi_schema
 
     def public_schema() -> dict[str, Any]:

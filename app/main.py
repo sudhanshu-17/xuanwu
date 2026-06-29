@@ -10,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.docs import setup_docs
+from app.api.v2.public.router import public_router
 from app.api.v2.router import api_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
@@ -79,6 +80,9 @@ def create_app() -> FastAPI:
         return response
 
     register_exception_handlers(app)
+    # Public router is mounted before (and outside) the restriction-guarded
+    # api_router so health checks survive maintenance mode.
+    app.include_router(public_router)
     app.include_router(api_router)
     setup_docs(app)
 

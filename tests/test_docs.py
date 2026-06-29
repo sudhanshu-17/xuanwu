@@ -52,3 +52,24 @@ async def test_docs_page_renders(client: AsyncClient) -> None:
     resp = await client.get("/docs")
     assert resp.status_code == 200
     assert "swagger-ui" in resp.text.lower()
+
+
+async def test_redoc_page_renders(client: AsyncClient) -> None:
+    resp = await client.get("/redoc")
+    assert resp.status_code == 200
+    assert "redoc" in resp.text.lower()
+
+
+async def test_schema_documents_security_schemes(client: AsyncClient) -> None:
+    schema = (await client.get("/openapi.json")).json()
+    schemes = schema["components"]["securitySchemes"]
+    assert {"AccessCookie", "BearerAuth", "CsrfToken", "ApiKeyId"} <= set(schemes)
+    assert schemes["AccessCookie"]["in"] == "cookie"
+    assert schemes["ApiKeyId"]["name"] == "X-Auth-Apikey"
+
+
+async def test_schema_has_tag_descriptions(client: AsyncClient) -> None:
+    schema = (await client.get("/openapi.json")).json()
+    tags = {tag["name"]: tag.get("description", "") for tag in schema["tags"]}
+    assert tags.get("public")
+    assert tags.get("identity")

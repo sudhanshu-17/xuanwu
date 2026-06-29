@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # --- App ---
     app_env: str = "development"
     app_name: str = "xuanwu"
+    app_version: str = "0.1.0"
+    git_tag: str = "unknown"  # set at build time (CI)
+    git_sha: str = "unknown"  # set at build time (CI)
     log_level: str = "info"
     cors_origins: str = "http://localhost:3000"  # comma-separated
     first_user_superadmin: bool = True  # the very first registered user becomes superadmin

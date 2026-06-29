@@ -1,4 +1,9 @@
-"""Public metadata: ping, server time, build version, client-safe configuration."""
+"""Public health, server time, build version and client-safe configuration.
+
+These endpoints carry no authentication and expose no secrets. They are mounted
+outside the IP/geo restriction guard so monitoring and load balancers can reach
+``/public/ping`` even while the API is in maintenance mode.
+"""
 
 from fastapi import APIRouter
 
