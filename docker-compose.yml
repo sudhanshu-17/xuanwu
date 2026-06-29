@@ -1,13 +1,15 @@
-# Dev orchestration for the Xuanwu auth server.
-# Phase 0 needs only `api` to boot /health; db + redis are included now because
-# Phase 1 wires them in immediately. Worker/beat/mailhog/minio land in later phases.
+# Dev orchestration for the Xuanwu auth server: db, redis, mailhog (email
+# catcher), minio (S3-compatible storage), the api, the Celery worker, and
+# Celery beat (scheduler). One process per container. For production see
+# docker-compose.prod.yml.
 #
 # Common commands (you never touch host Python — it all runs in containers):
 #   docker compose build api
-#   docker compose up api                       # http://localhost:8000/health
+#   docker compose up                           # whole stack
+#   docker compose up api                       # just the API → http://localhost:8000/health
 #   docker compose run --rm --no-deps api ruff check .
 #   docker compose run --rm --no-deps api mypy
-#   docker compose run --rm --no-deps api pytest -q
+#   docker compose run --rm api pytest -q
 
 services:
   db:
@@ -73,6 +75,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  beat:
+    build: .
+    # Scheduler: fires the periodic jobs in celery_app.beat_schedule
+    # (daily token cleanup now; storage invoicing etc. in Phase 17).
+    command: celery -A app.workers.celery_app:celery_app beat -l info
+    env_file: .env
+    volumes: ["./:/app"]
+    depends_on:
       redis:
         condition: service_healthy
 

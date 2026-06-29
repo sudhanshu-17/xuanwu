@@ -18,8 +18,29 @@ build: ## Build the api image
 up: ## Start the api (http://localhost:8000/health)
 	$(COMPOSE) up api
 
+stack: ## Start the whole stack (db, redis, api, worker, beat, mailhog, minio)
+	$(COMPOSE) up
+
 down: ## Stop everything
 	$(COMPOSE) down
+
+migrate: ## Apply database migrations
+	$(COMPOSE) run --rm api alembic upgrade head
+
+seed: ## Seed default permissions + levels (idempotent)
+	$(COMPOSE) run --rm api python -m app.console seed
+
+keys: ## Generate the RS256 JWT keypair
+	$(RUN) python -m app.console generate-keys
+
+superadmin: ## Create a superadmin (EMAIL=... [PASSWORD=...])
+	$(COMPOSE) run --rm api python -m app.console create-superadmin --email "$(EMAIL)" $(if $(PASSWORD),--password "$(PASSWORD)",)
+
+worker: ## Run a Celery worker
+	$(COMPOSE) up worker
+
+beat: ## Run the Celery beat scheduler
+	$(COMPOSE) up beat
 
 lint: ## ruff check
 	$(RUN) ruff check .
@@ -44,6 +65,7 @@ security: ## bandit + pip-audit
 	$(RUN) sh -c "bandit -q -c pyproject.toml -r app && pip-audit --ignore-vuln CVE-2025-65896"
 
 check: lint fmt-check type test ## Run all CI gates
-	@echo "All Phase 0 gates passed."
+	@echo "All gates passed."
 
-.PHONY: help lock build up down lint fmt fmt-check type test cov security check
+.PHONY: help lock build up stack down migrate seed keys superadmin worker beat \
+        lint fmt fmt-check type test cov security check

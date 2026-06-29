@@ -12,9 +12,32 @@ the `xuanwu/` directory.
 ## First-time / setup
 
 ```bash
-cp .env.example .env                       # create local env (once)
-docker compose run --rm api alembic upgrade head   # build the schema
-docker compose run --rm api python -m app.db.seeds # seed RBAC permissions + levels (idempotent)
+cp .env.example .env                                  # create local env (once)
+docker compose run --rm api alembic upgrade head      # build the schema
+docker compose run --rm api python -m app.console seed                            # RBAC permissions + levels (idempotent)
+docker compose run --rm api python -m app.console create-superadmin --email admin@example.com  # bootstrap admin
+```
+
+> Equivalent `make` targets: `make migrate`, `make seed`,
+> `make superadmin EMAIL=admin@example.com`.
+
+## Operator console
+
+```bash
+docker compose run --rm api python -m app.console generate-keys          # write the RS256 JWT keypair
+docker compose run --rm api python -m app.console generate-keys --force  # rotate (invalidates all tokens)
+docker compose run --rm api python -m app.console seed                   # default permissions + levels
+docker compose run --rm api python -m app.console create-superadmin --email admin@example.com [--username admin] [--password ...]
+```
+
+> `python -m app.db.seeds` still works as a thin alias for the seed command.
+
+## Background workers (Celery)
+
+```bash
+docker compose up worker                   # process tasks (email, SMS, audit writes)
+docker compose up beat                     # scheduler (daily expired-token sweep)
+docker compose up                          # the whole stack at once
 ```
 
 ## Run the app

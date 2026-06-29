@@ -114,7 +114,7 @@ warn_unreachable = true
 
 [[tool.mypy.overrides]]
 module = [
-    "zxcvbn", "qrcode", "pyotp", "fakeredis", "celery",
+    "zxcvbn", "qrcode", "pyotp", "fakeredis", "celery", "celery.schedules",
     "geoip2.*", "sendgrid", "sendgrid.*",
     "twilio.*", "boto3",
 ]

@@ -53,6 +53,25 @@ def _generate_keypair() -> tuple[str, str]:
     return private_pem, public_pem
 
 
+def write_keypair(*, force: bool = False) -> tuple[Path, Path]:
+    """Generate and persist an RS256 keypair at the configured paths.
+
+    Returns the ``(private, public)`` paths. Refuses to overwrite existing keys
+    unless ``force`` is set — rotating keys invalidates every issued token.
+    """
+    private_path = Path(settings.jwt_private_key_path)
+    public_path = Path(settings.jwt_public_key_path)
+    if not force and (private_path.exists() or public_path.exists()):
+        raise FileExistsError("JWT keys already exist; pass force=True to overwrite.")
+    private_pem, public_pem = _generate_keypair()
+    private_path.parent.mkdir(parents=True, exist_ok=True)
+    private_path.write_text(private_pem)
+    public_path.write_text(public_pem)
+    private_path.chmod(0o600)
+    _keys.cache_clear()
+    return private_path, public_path
+
+
 @lru_cache
 def _keys() -> tuple[str, str]:
     private_path = Path(settings.jwt_private_key_path)
