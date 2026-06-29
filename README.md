@@ -59,9 +59,14 @@ Named after Xuanwu (玄武), the Black Tortoise, guardian of the North.
 - **Immutable audit trail** written asynchronously through Celery.
 - **Perimeter hardening**: IP/subnet/country restrictions, rate limiting,
   optional reCAPTCHA, secure response headers, login lockout.
-- **Branded transactional email** (Jinja2 templates) and **SMS** with pluggable
-  providers (mock, SMTP/SendGrid, Twilio/AWS SNS).
-- **File storage** with a local or S3/R2 backend and time-limited presigned URLs.
+- **Transactional email** with branded Jinja2 templates, multi-language
+  support, background delivery, and automatic retry. Pluggable providers:
+  **SMTP**, **SendGrid**, or a mock catcher for development.
+- **SMS phone verification** with pluggable providers: **Twilio SMS**,
+  **Twilio Verify**, **AWS SNS**, or a mock provider for development.
+- **Object storage** for documents with **AWS S3** and **Cloudflare R2**
+  support (and a local filesystem backend), private by default and served over
+  time-limited presigned URLs.
 
 ## Tech stack
 
@@ -73,6 +78,10 @@ Named after Xuanwu (玄武), the Black Tortoise, guardian of the North.
 | Cache / state   | Redis (token state, RBAC cache, rate limits)       |
 | Background jobs | Celery (Redis broker) + Celery beat scheduler      |
 | Auth            | `pyjwt` (RS256), `passlib[bcrypt]`, `pyotp`         |
+| Email           | SMTP / SendGrid support                            |
+| SMS             | Twilio SMS / Twilio Verify / AWS SNS support       |
+| Object storage  | AWS S3 / Cloudflare R2 / local filesystem support  |
+| Captcha         | Google reCAPTCHA support                           |
 | Packaging       | Docker, Docker Compose                             |
 | Tooling         | ruff, mypy (strict), bandit, pip-audit, pytest     |
 
