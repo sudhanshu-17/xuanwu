@@ -36,6 +36,9 @@ type: ## mypy (strict)
 test: ## pytest
 	$(RUN) pytest -q
 
+cov: ## pytest with coverage report (needs db+redis up)
+	$(COMPOSE) run --rm api pytest -q --cov=app --cov-report=term-missing
+
 security: ## bandit + pip-audit
 	# CVE-2025-65896 (asyncmy): no fixed release exists yet; tracked + accepted.
 	$(RUN) sh -c "bandit -q -c pyproject.toml -r app && pip-audit --ignore-vuln CVE-2025-65896"
@@ -43,4 +46,4 @@ security: ## bandit + pip-audit
 check: lint fmt-check type test ## Run all CI gates
 	@echo "All Phase 0 gates passed."
 
-.PHONY: help lock build up down lint fmt fmt-check type test security check
+.PHONY: help lock build up down lint fmt fmt-check type test cov security check

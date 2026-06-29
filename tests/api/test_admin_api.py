@@ -1,46 +1,22 @@
 """Integration tests for the admin API: users, permissions, activities."""
 
-import uuid
-
-from app.core.security import hash_password
-from app.models.user import User
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
-IDENTITY = "/api/v2/xuanwu/identity"
+from tests.conftest import LoginAs, MakeUser
+
 ADMIN = "/api/v2/xuanwu/admin"
-PASSWORD = "Tr0ub4dour&3xtra"
-
-
-def _email() -> str:
-    return f"u{uuid.uuid4().hex[:12]}@example.com"
 
 
 def _csrf(token: str) -> dict[str, str]:
     return {"X-CSRF-Token": token}
 
 
-async def _login_as(client: AsyncClient, db: AsyncSession, role: str) -> str:
-    email = _email()
-    db.add(User(email=email, password_digest=hash_password(PASSWORD), role=role, state="active"))
-    await db.commit()
-    resp = await client.post(f"{IDENTITY}/sessions", json={"email": email, "password": PASSWORD})
-    assert resp.status_code == 200, resp.text
-    return str(resp.json()["data"]["csrf_token"])
-
-
-async def _make_member(db: AsyncSession) -> str:
-    user = User(email=_email(), password_digest=hash_password(PASSWORD), role="member")
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user.uid
-
-
 # --- users -------------------------------------------------------------------
-async def test_list_and_filter_users(client: AsyncClient, db: AsyncSession) -> None:
-    await _login_as(client, db, role="admin")
-    target = await _make_member(db)
+async def test_list_and_filter_users(
+    client: AsyncClient, login_as: LoginAs, make_user: MakeUser
+) -> None:
+    await login_as(role="admin")
+    target = (await make_user(role="member")).uid
 
     resp = await client.get(f"{ADMIN}/users", params={"uid": target})
     assert resp.status_code == 200
@@ -50,9 +26,11 @@ async def test_list_and_filter_users(client: AsyncClient, db: AsyncSession) -> N
     assert body["page"] == 1 and body["limit"] == 25
 
 
-async def test_get_user_includes_labels(client: AsyncClient, db: AsyncSession) -> None:
-    csrf = await _login_as(client, db, role="admin")
-    target = await _make_member(db)
+async def test_get_user_includes_labels(
+    client: AsyncClient, login_as: LoginAs, make_user: MakeUser
+) -> None:
+    _, csrf = await login_as(role="admin")
+    target = (await make_user(role="member")).uid
     await client.post(
         f"{ADMIN}/users/{target}/labels",
         json={"key": "email", "value": "verified", "scope": "private"},
@@ -63,9 +41,11 @@ async def test_get_user_includes_labels(client: AsyncClient, db: AsyncSession) -
     assert "email" in keys
 
 
-async def test_admin_label_drives_level_to_three(client: AsyncClient, db: AsyncSession) -> None:
-    csrf = await _login_as(client, db, role="admin")
-    target = await _make_member(db)
+async def test_admin_label_drives_level_to_three(
+    client: AsyncClient, login_as: LoginAs, make_user: MakeUser
+) -> None:
+    _, csrf = await login_as(role="admin")
+    target = (await make_user(role="member")).uid
 
     last = None
     for key in ("email", "phone", "document"):
@@ -80,9 +60,11 @@ async def test_admin_label_drives_level_to_three(client: AsyncClient, db: AsyncS
     assert body["state"] == "active"
 
 
-async def test_set_state_and_role(client: AsyncClient, db: AsyncSession) -> None:
-    csrf = await _login_as(client, db, role="admin")
-    target = await _make_member(db)
+async def test_set_state_and_role(
+    client: AsyncClient, login_as: LoginAs, make_user: MakeUser
+) -> None:
+    _, csrf = await login_as(role="admin")
+    target = (await make_user(role="member")).uid
 
     banned = await client.put(
         f"{ADMIN}/users/{target}/state", json={"state": "banned"}, headers=_csrf(csrf)
@@ -102,8 +84,8 @@ async def test_set_state_and_role(client: AsyncClient, db: AsyncSession) -> None
 
 
 # --- permissions (superadmin only) -------------------------------------------
-async def test_permissions_crud(client: AsyncClient, db: AsyncSession) -> None:
-    csrf = await _login_as(client, db, role="superadmin")
+async def test_permissions_crud(client: AsyncClient, login_as: LoginAs) -> None:
+    _, csrf = await login_as(role="superadmin")
 
     created = await client.post(
         f"{ADMIN}/permissions",
@@ -133,8 +115,8 @@ async def test_permissions_crud(client: AsyncClient, db: AsyncSession) -> None:
     assert deleted.status_code == 200
 
 
-async def test_invalid_verb_rejected(client: AsyncClient, db: AsyncSession) -> None:
-    csrf = await _login_as(client, db, role="superadmin")
+async def test_invalid_verb_rejected(client: AsyncClient, login_as: LoginAs) -> None:
+    _, csrf = await login_as(role="superadmin")
     resp = await client.post(
         f"{ADMIN}/permissions",
         json={"role": "manager", "verb": "FETCH", "path": "/x/", "action": "accept"},
@@ -144,17 +126,19 @@ async def test_invalid_verb_rejected(client: AsyncClient, db: AsyncSession) -> N
     assert "admin.permissions.invalid_verb" in resp.json()["errors"]
 
 
-async def test_plain_admin_cannot_manage_permissions(client: AsyncClient, db: AsyncSession) -> None:
-    await _login_as(client, db, role="admin")
+async def test_plain_admin_cannot_manage_permissions(
+    client: AsyncClient, login_as: LoginAs
+) -> None:
+    await login_as(role="admin")
     resp = await client.get(f"{ADMIN}/permissions")
     assert resp.status_code == 403
     assert "authz.forbidden" in resp.json()["errors"]
 
 
 # --- activities --------------------------------------------------------------
-async def test_activities_are_listed_and_filterable(client: AsyncClient, db: AsyncSession) -> None:
+async def test_activities_are_listed_and_filterable(client: AsyncClient, login_as: LoginAs) -> None:
     # Logging in as admin writes a `session`/`login` activity.
-    await _login_as(client, db, role="admin")
+    await login_as(role="admin")
     resp = await client.get(f"{ADMIN}/activities", params={"topic": "session", "action": "login"})
     assert resp.status_code == 200
     items = resp.json()["data"]["items"]
@@ -162,7 +146,7 @@ async def test_activities_are_listed_and_filterable(client: AsyncClient, db: Asy
 
 
 # --- authz -------------------------------------------------------------------
-async def test_member_forbidden_on_admin_users(client: AsyncClient, db: AsyncSession) -> None:
-    await _login_as(client, db, role="member")
+async def test_member_forbidden_on_admin_users(client: AsyncClient, login_as: LoginAs) -> None:
+    await login_as(role="member")
     resp = await client.get(f"{ADMIN}/users")
     assert resp.status_code == 403

@@ -1,6 +1,7 @@
 """Shared pytest fixtures."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -10,6 +11,7 @@ from app.core.config import settings
 from app.db.seeds import seed_levels, seed_permissions
 from app.db.session import get_db
 from app.main import app
+from app.models.user import User
 from fakeredis import FakeAsyncRedis
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
@@ -21,7 +23,14 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
+from tests.factories import PASSWORD, UserFactory
+
 _SEEDED_ROLES = ("superadmin", "admin", "member", "guest")
+_IDENTITY = "/api/v2/xuanwu/identity"
+
+# Callable fixture aliases (a factory-builder and a login helper).
+MakeUser = Callable[..., Awaitable[User]]
+LoginAs = Callable[..., Awaitable[tuple[User, str]]]
 
 
 @pytest.fixture(autouse=True)
@@ -126,3 +135,34 @@ async def client(_engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
     finally:
         app.dependency_overrides.clear()
         await test_redis.aclose()
+
+
+@pytest.fixture
+def make_user(db: AsyncSession) -> MakeUser:
+    """Build a user with ``UserFactory`` and persist it via the test session."""
+
+    async def _make(**kwargs: Any) -> User:
+        user: User = UserFactory.build(**kwargs)
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        return user
+
+    return _make
+
+
+@pytest.fixture
+def login_as(client: AsyncClient, make_user: MakeUser) -> LoginAs:
+    """Create a user of the given role/state, log in, and return ``(user, csrf)``."""
+
+    async def _login(
+        role: str = "member", state: str = "active", **kwargs: Any
+    ) -> tuple[User, str]:
+        user = await make_user(role=role, state=state, **kwargs)
+        resp = await client.post(
+            f"{_IDENTITY}/sessions", json={"email": user.email, "password": PASSWORD}
+        )
+        assert resp.status_code == 200, resp.text
+        return user, str(resp.json()["data"]["csrf_token"])
+
+    return _login

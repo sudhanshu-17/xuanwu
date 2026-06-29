@@ -54,6 +54,7 @@ dev = [
     "pip-audit>=2.7,<3",
     "pytest>=9.1,<10",
     "pytest-asyncio>=1.4,<2",
+    "pytest-cov>=6.0,<7",
     "factory-boy>=3.3",
     "fakeredis>=2.26,<3",
     "types-pyyaml>=6.0",
@@ -119,6 +120,13 @@ module = [
 ]
 ignore_missing_imports = true
 
+# factory_boy ships an incomplete py.typed; skip following it so its untyped
+# helpers resolve to Any in our (strict) test factories.
+[[tool.mypy.overrides]]
+module = ["factory"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
@@ -126,6 +134,24 @@ addopts = "-ra"
 filterwarnings = [
     # passlib imports the stdlib `crypt` module, deprecated upstream; not our code.
     "ignore:'crypt' is deprecated:DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = [
+    "app/main.py",            # app factory / wiring, exercised end-to-end
+    "app/workers/celery_app.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
 ]
 
 [tool.bandit]
